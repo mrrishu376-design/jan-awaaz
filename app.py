@@ -11,7 +11,7 @@ st.set_page_config(page_title="Jan Awaaz", page_icon="🏛️", layout="wide")
 CATEGORIES = ["Roads", "Water", "Health", "Education", "Sanitation",
               "Electricity", "Transport", "Safety", "Environment", "Other"]
 
-MODEL = "gemini-2.5-flash"  # agar ye model na chale to Google AI Studio se available Flash model ka naam yahan daal do
+MODEL = "gemini-3.8-flash"  # agar ye model na chale to Google AI Studio se available Flash model ka naam yahan daal do
 
 PROMPT = """You are an assistant for an Indian Member of Parliament's office.
 A citizen sent this message (it may be in Hindi, English, Hinglish or another Indian language):
