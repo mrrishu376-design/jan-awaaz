@@ -248,7 +248,8 @@ def transcribe(audio_bytes, api_key):
 # ================= UI =================
 st.markdown("""
 <style>
-.block-container{max-width:1100px;padding-top:1.2rem}
+.block-container{max-width:1100px;padding-top:4.5rem}
+footer{visibility:hidden}
 .brand{display:flex;align-items:center;gap:10px;font-size:1.7rem;font-weight:800;color:#1a56db}
 .logo{background:#1a56db;color:#fff;border-radius:12px;padding:6px 10px;font-size:1.3rem}
 .hero{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:24px 26px;border-radius:20px;margin:10px 0 6px}
