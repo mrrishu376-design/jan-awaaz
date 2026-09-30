@@ -5,6 +5,7 @@ import html
 import json
 import os
 import re
+import time
 
 import pandas as pd
 import streamlit as st
@@ -173,7 +174,7 @@ def gemini_client(api_key):
 def pick_model(client):
     if st.session_state.get("model"):
         return st.session_state["model"]
-    best, best_ver = FALLBACK_MODEL, (-1,)
+    found = []
     try:
         for m in client.models.list():
             name = getattr(m, "name", "").replace("models/", "")
@@ -183,12 +184,36 @@ def pick_model(client):
             if actions and "generateContent" not in actions:
                 continue
             ver = tuple(int(n) for n in re.findall(r"\d+", name)[:3]) or (0,)
-            if ver > best_ver:
-                best, best_ver = name, ver
+            found.append((ver, name))
     except Exception as e:  # noqa: BLE001
         st.session_state["last_error"] = "Model list error: " + str(e)
-    st.session_state["model"] = best
-    return best
+    names = [n for _, n in sorted(found, reverse=True)] or [FALLBACK_MODEL]
+    st.session_state["model_list"] = names
+    st.session_state["model"] = names[0]
+    return names[0]
+
+
+def generate(client, contents):
+    """Gemini call with retry on 503/429 and fallback to the next available Flash model."""
+    pick_model(client)
+    names = st.session_state.get("model_list") or [FALLBACK_MODEL]
+    last = None
+    for name in names[:3]:
+        for _ in range(2):
+            try:
+                out = client.models.generate_content(model=name, contents=contents)
+                st.session_state["model"] = name
+                return out
+            except Exception as e:  # noqa: BLE001
+                last = e
+                msg = str(e)
+                if "404" in msg or "NOT_FOUND" in msg:
+                    break
+                if any(x in msg for x in ("503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED")):
+                    time.sleep(1.5)
+                    continue
+                raise
+    raise last
 
 
 def classify(text, api_key, image=None):
@@ -199,7 +224,7 @@ def classify(text, api_key, image=None):
             if image:
                 from google.genai import types
                 contents.append(types.Part.from_bytes(data=image[0], mime_type=image[1]))
-            resp = client.models.generate_content(model=pick_model(client), contents=contents)
+            resp = generate(client, contents)
             return clean_result(parse_json(resp.text)), "Gemini AI"
         except Exception as e:  # noqa: BLE001
             st.session_state["last_error"] = str(e)
@@ -210,9 +235,9 @@ def transcribe(audio_bytes, api_key):
     try:
         from google.genai import types
         client = gemini_client(api_key)
-        resp = client.models.generate_content(
-            model=pick_model(client),
-            contents=["Transcribe this audio exactly (Hindi or English). Reply with only the transcript.",
+        resp = generate(
+            client,
+            ["Transcribe this audio exactly (Hindi or English). Reply with only the transcript.",
                       types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")])
         return resp.text.strip()
     except Exception as e:  # noqa: BLE001
@@ -408,9 +433,9 @@ population {int(w.population):,} • <b>Priority {int(w.score)}/100</b></span><b
                 if api_key:
                     try:
                         client = gemini_client(api_key)
-                        out = client.models.generate_content(
-                            model=pick_model(client),
-                            contents="Write a short 5-line briefing (simple English) for an Indian MP about these "
+                        out = generate(
+                            client,
+                            "Write a short 5-line briefing (simple English) for an Indian MP about these "
                                      "ranked development priorities. Say what to do first and why:\n" + summary)
                         st.info(out.text)
                     except Exception as e:  # noqa: BLE001
